@@ -14,16 +14,15 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
-from . import APP_ID, APP_NAME, audio  # noqa: E402
+from . import APP_ID, audio  # noqa: E402
 from .asr import Engine, Stream
 from .config import config
 from .models import BY_ID, Download
 from .transcript import Transcript
 from .translate import Translator, stop_leftover_servers
-from .ui.main_window import ME, MEETING, MainWindow
+from .ui.live_view import ME, MEETING
+from .ui.main_window import MainWindow
 from .ui.overlay import create_overlay
-from .ui.assistant import AssistantDialog
-from .ui.settings import SettingsDialog
 
 CSS = """
 /* Paolium dark palette (Depth, Base, Surface, Border, Text) with the Sapphire accent.
@@ -82,12 +81,9 @@ CSS = """
 .turn-text { font-size: 1.15em; }
 .live-text { font-size: 1.15em; opacity: 0.55; }
 .timer { font-feature-settings: "tnum"; font-weight: bold; }
-.file-toolbar {
-    padding: 8px 16px;
-    border-bottom: 1px solid #3A3A3C;
-    background: #000000;
-}
-.file-title { font-weight: bold; font-size: 1.1em; margin: 0 16px; }
+/* Depth frames the window (header, sidebar, footer); the page bars below the header sit on Base */
+.main-header { background: #000000; box-shadow: none; }
+.file-toolbar { padding: 8px 16px; background: #141414; }
 .pill-bar {
     background: #141414;
     border: 1px solid #3A3A3C;
@@ -95,7 +91,9 @@ CSS = """
     padding: 3px;
 }
 .pill-bar button { border-radius: 999px; min-height: 30px; padding: 0 12px; }
-.pill-bar button:checked { background: alpha(#0D71FD, 0.22); color: #5C9DFE; font-weight: bold; }
+.pill-bar button:checked:not(.state-toggle) { background: alpha(#0D71FD, 0.22); color: #5C9DFE; font-weight: bold; }
+.pill-actions button:hover { color: #5C9DFE; }
+.pill-actions button.danger:hover { color: #FA4F67; }
 /* On/off: only the icon or text changes color; off gets a diagonal slash */
 .state-toggle, .state-toggle:checked, .state-toggle:hover, .state-toggle:checked:hover {
     background: none;
@@ -105,21 +103,21 @@ CSS = """
 .state-toggle:hover { color: currentColor; }
 .state-label { font-weight: bold; }
 .toggle-mic:checked { color: #FA4F67; }
-.toggle-overlay:checked { color: #D69D00; }
+.toggle-overlay:checked { color: #5C9DFE; }
 .toggle-es:checked { color: #5C9DFE; }
+.toggle-overlay:hover, .toggle-es:hover { color: #5C9DFE; }
 /* when on: hovering makes them lighter and slightly bigger */
 .state-toggle:checked:hover image { -gtk-icon-transform: scale(1.12); }
 .toggle-mic:checked:hover { color: #FC8798; }
-.toggle-overlay:checked:hover { color: #F0BE3A; }
+.toggle-overlay:checked:hover { color: #93BEFE; }
 .toggle-es:checked:hover { color: #93BEFE; }
 
 /* Meeting list */
-.meeting-row .row-delete { opacity: 0; }
-.meeting-row:hover .row-delete { opacity: 0.6; }
-.row-delete, .row-delete:hover { background: none; box-shadow: none; }
-.meeting-row .row-delete:hover { opacity: 1; color: #FA4F67; }
 .live-row:hover .live-dot { color: #FA4F67; }
 .live-dot.recording { color: #FA4F67; animation: live-pulse 1.6s ease-in-out infinite; }
+.translator-dot { color: alpha(currentColor, 0.45); }
+.translator-row:hover .translator-dot { color: #5C9DFE; }
+.translator-dot.inside, .translator-row:hover .translator-dot.inside { color: #5C9DFE; }
 @keyframes live-pulse { 0% { opacity: 1; } 50% { opacity: 0.35; } 100% { opacity: 1; } }
 .sidebar-settings { margin: 6px; }
 /* Text translator */
@@ -127,13 +125,13 @@ CSS = """
 .assistant-box textview, .assistant-box text { background: transparent; color: #D6DAE0; }
 .assistant-text { font-size: 1.05em; }
 .assistant-direction { color: #5C9DFE; font-weight: bold; }
-.header-tool { color: alpha(currentColor, 0.75); }
-.header-tool:hover { color: #5C9DFE; background: none; }
 /* "Designed by Paolium" footer (like the one on paolium.web.app) */
-.footer-brand link { color: #D6DAE0; }
+.footer-brand link { color: #D6DAE0; text-decoration: none; }
 .app-footer { padding: 6px 16px; border-top: 1px solid #3A3A3C; background: #000000; }
 .footer-small { font-size: 0.8em; color: alpha(#D6DAE0, 0.6); }
 .footer-brand { font-weight: 600; letter-spacing: -0.02em; color: #D6DAE0; }
+.app-name { font-weight: 600; letter-spacing: -0.02em; }
+.sidebar-brand { padding: 12px 0 10px; }
 """
 
 
@@ -171,6 +169,8 @@ class App(Adw.Application):
         self.overlay = create_overlay(self)
         self.win.present()
         stop_leftover_servers()  # from a previous session that did not close cleanly
+        if config["translation_active"]:
+            self.win.es_btn.set_active(True)  # after stop_leftover_servers, which would stop its llama-server
         if note := config.fit_to_hardware():
             GLib.timeout_add(800, lambda: self.win.toast(note))
         GLib.timeout_add(1000, self.tick)
@@ -232,6 +232,7 @@ class App(Adw.Application):
         return self._translator
 
     def set_translation_active(self, active):
+        config.set("translation_active", active)  # turned off again below when it cannot start
         if not active:
             self.win.view.set_translator(None)
             if self._translator:
@@ -261,18 +262,9 @@ class App(Adw.Application):
         Download.start_for(model).listen(done)
         self.win.toast(f"Downloading {model.name}… (progress in Settings → Translation)")
 
-    # --- ajustes ---
-    def show_settings(self, page=None):
-        dialog = SettingsDialog(self)
-        # Almost the window size (20 % smaller) so nothing gets cut
-        dialog.set_content_width(int(self.win.get_width() * 0.8))
-        dialog.set_content_height(int(self.win.get_height() * 0.8))
-        if page:
-            dialog.set_visible_page_name(page)
-        dialog.present(self.win)
-
-    def show_assistant(self):
-        AssistantDialog(self).present(self.win)
+    # --- settings ---
+    def show_settings(self, tab=None):
+        self.win.workspace.open_settings(tab)
 
     def set_overlay_enabled(self, enabled):
         config.set("overlay_enabled", enabled)
@@ -301,8 +293,9 @@ class App(Adw.Application):
         self.started = time.time()
         self.transcript = Transcript(config.meetings_dir)
         self.win.view.clear()
-        self.win.meetings.select_row(self.win.meetings.get_row_at_index(0))
-        self.win.stack.set_visible_child_name("live")
+        self.win.workspace.close_cover()
+        self.win.meetings.select_row(self.win.live_row)
+        self.win.workspace.show("live")
         self.win.record_btn.set_label("Stop")
         self.win.record_btn.set_css_classes(["destructive-action"])
         self.win.mic_btn.set_sensitive(False)
@@ -342,10 +335,10 @@ class App(Adw.Application):
         self.win.record_btn.set_sensitive(True)
         self.win.mic_btn.set_sensitive(True)
         self.win.set_recording(False)
-        self.win.timer.set_label(APP_NAME)
+        self.win.update_title()
         self.update_overlay()
         self.win.refresh_meetings()
-        self.win.meetings.select_row(self.win.meetings.get_row_at_index(0))
+        self.win.meetings.select_row(self.win.live_row)
         if path:
             self.win.toast(f"Saved to {path.name}", "Open", lambda: self.win.open_path(path))
         else:
@@ -359,9 +352,7 @@ class App(Adw.Application):
 
     def tick(self):
         if self.recording:
-            secs = int(time.time() - self.started)
-            self.win.timer.set_markup(f"<span foreground='#FA4F67'>●</span> "
-                                      f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}")
+            self.win.update_title()
         return True
 
     def update_overlay(self):

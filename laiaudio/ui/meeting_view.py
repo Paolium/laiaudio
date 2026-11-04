@@ -1,9 +1,11 @@
-"""Saved meeting: a sticky bar with the title and actions, and the .md as a preview or as Markdown."""
+"""Saved meeting: a sticky bar with the view modes and actions, and the .md as a preview or as Markdown."""
 import re
 import subprocess
 from datetime import datetime
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+
+from .widgets import icon_button
 
 # Automatic headings (the Spanish ones come from transcripts made before the English UI)
 DEFAULT_HEADING = re.compile(r"^(?:Meeting|Reunión) — (\d{4}-\d{2}-\d{2} \d{2}:\d{2})$")
@@ -82,14 +84,8 @@ def ask_title(parent, path, on_renamed):
     entry.grab_focus()
 
 
-def icon_button(icon, tooltip, action):
-    button = Gtk.Button(icon_name=icon, tooltip_text=tooltip, css_classes=["flat"])
-    button.connect("clicked", lambda *_: action())
-    return button
-
-
 class MeetingView(Gtk.Box):
-    """Sticky bar on top (mode · title · actions) and the scrollable content below."""
+    """Sticky bar on top (modes · actions; the header shows the title) and the scrollable content below."""
 
     def __init__(self, window):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -105,18 +101,18 @@ class MeetingView(Gtk.Box):
         modes.append(preview_btn)
         modes.append(source_btn)
 
-        self.title = Gtk.Label(css_classes=["file-title"], ellipsize=Pango.EllipsizeMode.END)
-        actions = Gtk.Box(css_classes=["pill-bar"])
+        actions = Gtk.Box(css_classes=["pill-bar", "pill-actions"])
         for icon, tooltip, action in (
-            ("document-edit-symbolic", "Edit title", self.edit_title),
             ("edit-copy-symbolic", "Copy all text", self.copy_all),
+            ("document-edit-symbolic", "Edit title", self.edit_title),
             ("folder-open-symbolic", "Show the .md file in the file manager", lambda: show_in_file_manager(self.path)),
-            ("user-trash-symbolic", "Delete", self.delete),
         ):
             actions.append(icon_button(icon, tooltip, action))
+        delete = icon_button("user-trash-symbolic", "Delete", self.delete)
+        delete.add_css_class("danger")  # ruby on hover
+        actions.append(delete)
 
-        bar = Gtk.CenterBox(css_classes=["file-toolbar"], start_widget=modes, center_widget=self.title,
-                            end_widget=actions)
+        bar = Gtk.CenterBox(css_classes=["file-toolbar"], start_widget=modes, end_widget=actions)
         self.append(bar)
 
         # --- content ---
@@ -134,7 +130,6 @@ class MeetingView(Gtk.Box):
     def load(self, path):
         self.path = path
         text = path.read_text(encoding="utf-8")
-        self.title.set_text(meeting_title(path))
         self.source.get_buffer().set_text(text)
         while child := self.preview.get_first_child():
             self.preview.remove(child)
@@ -143,7 +138,7 @@ class MeetingView(Gtk.Box):
 
     def preview_line(self, line):
         if not line or line.startswith("# "):
-            return  # the title is already in the bar
+            return  # the title is already in the header
         if match := TURN.match(line):
             time, speaker, text = match.groups()
             css = "speaker-me" if speaker in ME_LABELS else "speaker-meeting"

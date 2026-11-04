@@ -12,6 +12,7 @@ DEFAULTS = {
     "system_source": "auto",       # auto = whatever plays on the default output
     "mic_source": "auto",          # auto = default microphone
     "use_mic": True,
+    "translation_active": False,   # the ES toggle, restored at startup
     "sidebar_visible": True,
     "overlay_enabled": True,
     "overlay_lines": 2,

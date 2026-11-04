@@ -29,3 +29,9 @@ class StateToggle(Gtk.ToggleButton):
         cr.move_to(x0, y0)
         cr.line_to(x0 + size, y0 - size)
         cr.stroke()
+
+
+def icon_button(icon, tooltip, action):
+    button = Gtk.Button(icon_name=icon, tooltip_text=tooltip, css_classes=["flat"])
+    button.connect("clicked", lambda *_: action())
+    return button

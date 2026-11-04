@@ -17,26 +17,35 @@ laiaudio/
   models.py          model catalog and downloader
   hardware.py        GPU detection, VRAM budget, recommendations
   ui/
-    main_window.py   window, sidebar, live transcript view, footer
+    main_window.py   window, sidebar, header and footer
+    workspace.py     content stack: status, live transcript, saved meeting and translator pages
+    live_view.py     live transcript (one block per turn, optional Spanish column)
     meeting_view.py  saved meeting viewer (preview / Markdown) and its actions
     overlay.py       floating caption bar: shared text logic + LayerShellOverlay and X11Overlay
-    settings.py      tabbed settings dialog
-    assistant.py     text translator dialog (Spanish → B2 English, English → Spanish)
+    settings.py      settings page with its tabs in a centered pill bar
+    translator_view.py text translator page (Spanish → B2 English, English → Spanish)
     model_card.py    model card with download, progress and delete
-    widgets.py       StateToggle (colored icon on, slashed icon off)
+    widgets.py       StateToggle (colored icon on, slashed icon off) and icon_button
   data/
-    paolium-logo.svg app icon and footer logo
+    paolium-logo.svg app icon and sidebar logo
 ```
 
 ## UI structure
 
-- **Sidebar** (collapsible `Adw.OverlaySplitView`): search, the "Live" row with the recording dot, saved meetings
-  with a delete button shown on hover, and a sticky Settings button.
-- **Header**: sidebar toggle, Start/Stop, timer as the title, and three `StateToggle`s: ES (sapphire), floating
-  captions (gold) and microphone (ruby).
-- **Content stack**: a status page (loading, missing model, ready), the live `TranscriptView` and the
-  `MeetingView`.
-- **Footer**: the Paolium logo plus "Designed by Paolium." with the sidebar open; only the small logo with it closed.
+- **Sidebar** (collapsible `Adw.OverlaySplitView`): the Paolium logo with the app name right below it, search, the "Translator" row with a dot that is sapphire while
+  the translator is open, the "Live" row with the recording dot, saved meetings (deleted from the meeting's
+  own action bar), and a sticky Settings button.
+- **Header**: sidebar toggle, Start/Stop and the only page title ("Translator", "Settings", the open meeting's
+  title, the timer while recording on the live page, or "New meeting").
+- **Live bar**: shown only on the live page (status or transcript): a pill group with three `StateToggle`s:
+  microphone (ruby), floating captions and ES (sapphire). Leaving a finished, saved recording clears the live
+  transcript, so "Live" starts again from "Ready".
+- **Workspace** (`Workspace`, a `Gtk.Stack`): a status page (loading, missing model, ready), the live
+  `TranscriptView`, the `MeetingView`, the `TranslatorView` and the `SettingsView` (tabs, rebuilt on every open).
+  The translator and settings cover the other pages: background changes update the page behind them, and closing
+  them (Start or a sidebar row) returns there.
+  It frees the shared LLM when it closes.
+- **Footer**: "Designed by Paolium." (no logo; the logo lives in the sidebar).
 
 ## Rules
 
@@ -44,7 +53,7 @@ laiaudio/
 - Stream events (`partial`, `committed`) arrive on worker threads and must hop to the main thread with
   `GLib.idle_add` before touching widgets.
 - Never change a widget's model or selection inside its own `notify` handler: GTK notifies again and creates an
-  endless loop. Defer it with `GLib.idle_add` (see `SettingsDialog.on_pick`).
+  endless loop. Defer it with `GLib.idle_add` (see `SettingsView.on_pick`).
 - Never move a layer-shell surface to another monitor while a pointer grab is active: the compositor recreates the
   surface and GTK spins. The overlay moves within its screen while dragging and jumps on drop.
 
@@ -62,5 +71,5 @@ Verified under Mutter 46 (Ubuntu 24.04): starts centered at the bottom, drags wi
 position.
 - The floating bar uses fixed-width lines and never shrinks mid-sentence; it accepts corrections of equal or
   greater length only.
-- Models are selected only through `SettingsDialog`, which consults `hardware.problem()`; `config.fit_to_hardware()`
+- Models are selected only through `SettingsView`, which consults `hardware.problem()`; `config.fit_to_hardware()`
   fixes saved combinations at startup.

@@ -44,7 +44,7 @@ The text translator (`TextAssistant`) reuses the same local LLM: Spanish text is
 and English text is translated into Spanish.
 
 Both share a single `llama-server` process (`acquire_llama` / `release_llama`), so the model never sits twice in
-video memory; it stops when neither the live translation nor the translator dialog uses it. It is always started
+video memory; it stops when neither the live translation nor the translator page uses it. It is always started
 from one long-lived thread, because `PR_SET_PDEATHSIG` fires when the *thread* that forked it exits.
 
 `llama-server` runs as a child process that dies with the app (`PR_SET_PDEATHSIG`), leaves 1 GB of video memory

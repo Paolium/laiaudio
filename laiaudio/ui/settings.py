@@ -1,4 +1,4 @@
-"""Tabbed settings: General, Audio, Transcription and Translation."""
+"""Settings page: tabs for General, Audio, Transcription and Translation."""
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import audio
@@ -17,7 +17,7 @@ def combo(title, labels, selected, on_selected, subtitle=None):
 
 
 def widen(widget, size=920):
-    """libadwaita caps pages at ~600 px; in a large dialog that cuts names with an ellipsis."""
+    """libadwaita caps pages at ~600 px; in the wide workspace that cuts names with an ellipsis."""
     child = widget.get_first_child()
     while child:
         if isinstance(child, (Adw.Clamp, Adw.ClampScrollable)):
@@ -30,19 +30,45 @@ def widen(widget, size=920):
 SETTING = {"asr": "asr_model", "translation": "translation"}
 
 
-class SettingsDialog(Adw.PreferencesDialog):
+class SettingsView(Gtk.Box):
+    """Sticky bar with the tabs as a centered pill bar and the selected tab below (the header shows the title).
+
+    The tabs are rebuilt every time the page opens, so devices, screens and models are always current.
+    """
+
     def __init__(self, app):
-        super().__init__(title="Settings", search_enabled=False)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.app = app
         self.pickers = {}       # kind -> (dropdown, models, card)
         self.updating = False   # ignore the changes made by the code itself
-        self.add(self.general_page())
-        self.add(self.audio_page())
-        self.add(self.model_page("asr", "transcription", "Transcription", "audio-input-microphone-symbolic",
-                                 "Transcription model", "Turns English speech into text"))
-        self.add(self.model_page("translation", "translation", "Translation", "preferences-desktop-locale-symbolic",
-                                 "Translation engine", "What appears in the Spanish column (ES button)"))
-        self.connect("map", lambda *_: widen(self))  # pages finish building when shown
+        self.bar = Gtk.CenterBox(css_classes=["file-toolbar"])
+        self.toasts = Adw.ToastOverlay(vexpand=True)
+        self.append(self.bar)
+        self.append(self.toasts)
+
+    def load(self, tab=None):
+        self.pickers.clear()
+        tabs = Gtk.Stack()
+        pills = Gtk.Box(css_classes=["pill-bar"])
+        for page in (self.general_page(), self.audio_page(),
+                     self.model_page("asr", "transcription", "Transcription", "audio-input-microphone-symbolic",
+                                     "Transcription model", "Turns English speech into text"),
+                     self.model_page("translation", "translation", "Translation",
+                                     "preferences-desktop-locale-symbolic",
+                                     "Translation engine", "What appears in the Spanish column (ES button)")):
+            tabs.add_named(page, page.get_name())
+            page.connect("map", widen)  # pages finish building when shown
+            button = Gtk.ToggleButton(label=page.get_title(), css_classes=["flat"], group=pills.get_first_child(),
+                                      active=page.get_name() == (tab or "general"))
+            button.connect("toggled", lambda b, name=page.get_name(): b.get_active() and
+                           tabs.set_visible_child_name(name))
+            pills.append(button)
+        tabs.set_visible_child_name(tab or "general")
+        self.bar.set_center_widget(pills)
+        self.toasts.set_child(tabs)
+
+    def add_toast(self, toast):
+        self.toasts.add_toast(toast)
 
     # --- General ---
     def general_page(self):

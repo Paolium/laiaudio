@@ -2,7 +2,7 @@
 
 ## Source assets
 
-- `laiaudio/data/paolium-logo.svg`: the Paolium wheat logo, used as the app icon and in the footer. It is copied
+- `laiaudio/data/paolium-logo.svg`: the Paolium wheat logo, used as the app icon and above the app name in the sidebar. It is copied
   from the Paolium brand repository and must not be edited here.
 
 ## Identity
