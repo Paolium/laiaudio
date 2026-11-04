@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Laiaudio
+Comment=Live meeting captions with local AI
+Exec=@BIN@/laiaudio
+Icon=laiaudio
+Terminal=false
+Categories=AudioVideo;Audio;Office;
+Keywords=captions;subtitles;transcription;translation;meeting;
+StartupWMClass=com.paolium.Laiaudio

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laiaudio"
+version = "1.0.0"
+description = "Live meeting captions with local AI: real-time English transcription, Spanish translation and Markdown transcripts"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Paolium" }]
+requires-python = ">=3.11"
+# GTK4, libadwaita and gtk4-layer-shell come from the system (install.sh installs them with pacman)
+dependencies = [
+    "numpy",
+    "onnx-asr",
+    "ctranslate2",
+    "sentencepiece",
+]
+
+[project.optional-dependencies]
+# install.sh picks one depending on whether there is an NVIDIA GPU
+nvidia = ["onnxruntime-gpu[cuda,cudnn]"]
+cpu = ["onnxruntime"]
+
+[project.urls]
+Homepage = "https://github.com/Paolium/laiaudio"
+Paolium = "https://paolium.web.app/"
+
+[tool.setuptools.packages.find]
+include = ["laiaudio*"]
+
+[tool.setuptools.package-data]
+laiaudio = ["data/*.svg"]
