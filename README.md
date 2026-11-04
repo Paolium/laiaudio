@@ -48,8 +48,8 @@ real conversations:
 | **Models on demand** | Choose and download models from Settings, with clear trade-offs. Nothing to install by hand. |
 
 <div align="center">
-<img src="docs/images/meeting.png" alt="Saved meeting preview with title, copy, file manager and delete actions" width="440">
-<img src="docs/images/settings.png" alt="Settings with hardware-aware model selection" width="440">
+<img src="docs/images/meeting.png" alt="Saved meeting preview with copy, edit title, file manager and delete actions" width="440">
+<img src="docs/images/settings.png" alt="Settings page with tabs and hardware-aware model selection" width="440">
 </div>
 
 ## Privacy first
