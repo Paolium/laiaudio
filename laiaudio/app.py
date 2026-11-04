@@ -22,6 +22,7 @@ from .transcript import Transcript
 from .translate import Translator, stop_leftover_servers
 from .ui.main_window import ME, MEETING, MainWindow
 from .ui.overlay import create_overlay
+from .ui.assistant import AssistantDialog
 from .ui.settings import SettingsDialog
 
 CSS = """
@@ -121,6 +122,13 @@ CSS = """
 .live-dot.recording { color: #FA4F67; animation: live-pulse 1.6s ease-in-out infinite; }
 @keyframes live-pulse { 0% { opacity: 1; } 50% { opacity: 0.35; } 100% { opacity: 1; } }
 .sidebar-settings { margin: 6px; }
+/* Text translator */
+.assistant-box { background: #000000; border: 1px solid #3A3A3C; border-radius: 10px; }
+.assistant-box textview, .assistant-box text { background: transparent; color: #D6DAE0; }
+.assistant-text { font-size: 1.05em; }
+.assistant-direction { color: #5C9DFE; font-weight: bold; }
+.header-tool { color: alpha(currentColor, 0.75); }
+.header-tool:hover { color: #5C9DFE; background: none; }
 /* "Designed by Paolium" footer (like the one on paolium.web.app) */
 .footer-brand link { color: #D6DAE0; }
 .app-footer { padding: 6px 16px; border-top: 1px solid #3A3A3C; background: #000000; }
@@ -262,6 +270,9 @@ class App(Adw.Application):
         if page:
             dialog.set_visible_page_name(page)
         dialog.present(self.win)
+
+    def show_assistant(self):
+        AssistantDialog(self).present(self.win)
 
     def set_overlay_enabled(self, enabled):
         config.set("overlay_enabled", enabled)

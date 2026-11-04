@@ -21,6 +21,7 @@ laiaudio/
     meeting_view.py  saved meeting viewer (preview / Markdown) and its actions
     overlay.py       floating caption bar: shared text logic + LayerShellOverlay and X11Overlay
     settings.py      tabbed settings dialog
+    assistant.py     text translator dialog (Spanish → B2 English, English → Spanish)
     model_card.py    model card with download, progress and delete
     widgets.py       StateToggle (colored icon on, slashed icon off)
   data/

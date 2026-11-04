@@ -110,16 +110,18 @@ class LlamaServer:
         raise RuntimeError("llama-server did not respond")
 
     def translate(self, text, context):
+        return self.chat(PROMPT, _user_message(text, context))
+
+    def chat(self, system, user, max_tokens=300, timeout=30):
         body = json.dumps({
-            "messages": [{"role": "system", "content": PROMPT},
-                         {"role": "user", "content": _user_message(text, context)}],
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": 0.2,
-            "max_tokens": 300,
+            "max_tokens": max_tokens,
             "cache_prompt": True,  # reuse the already processed instructions
         }).encode()
         req = urllib.request.Request(f"http://127.0.0.1:{self.PORT}/v1/chat/completions", data=body,
                                      headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=30) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)["choices"][0]["message"]["content"].strip()
 
     def close(self):
@@ -131,7 +133,142 @@ class LlamaServer:
                 self.proc.kill()
 
 
-BACKENDS = {"marian": Marian, "llama": LlamaServer}
+_server = None         # the one llama-server process, shared by the live translator and the text translator
+_server_users = 0
+_server_lock = threading.Lock()
+
+
+class _Spawner(threading.Thread):
+    """The only thread that starts llama-server.
+
+    PR_SET_PDEATHSIG fires when the *thread* that forked the child exits, not only the process: a server started
+    from a short-lived worker thread would die with it. This thread lives as long as the app.
+    """
+
+    def __init__(self):
+        super().__init__(daemon=True, name="llama-spawner")
+        self.jobs = queue.Queue()
+
+    def run(self):
+        while True:
+            factory, reply = self.jobs.get()
+            try:
+                reply.put((factory(), None))
+            except Exception as e:  # noqa: BLE001
+                reply.put((None, e))
+
+    def start_server(self, model):
+        reply = queue.Queue()
+        self.jobs.put((lambda: LlamaServer(model), reply))
+        server, error = reply.get()
+        if error:
+            raise error
+        return server
+
+
+_spawner = _Spawner()
+_spawner.start()
+
+
+def acquire_llama(model):
+    """Start llama-server (blocking) or reuse the running one: only one copy of the model ever sits in VRAM."""
+    global _server, _server_users
+    with _server_lock:
+        if _server is None or _server.proc.poll() is not None:
+            _server = _spawner.start_server(model)
+        _server_users += 1
+        return _server
+
+
+def release_llama():
+    """Stop llama-server once nobody uses it, freeing its video memory."""
+    global _server, _server_users
+    with _server_lock:
+        _server_users = max(0, _server_users - 1)
+        if _server_users == 0 and _server is not None:
+            _server.close()
+            _server = None
+
+
+class SharedLlama:
+    """Live-translation backend on top of the shared llama-server."""
+
+    def __init__(self, model):
+        self.server = acquire_llama(model)
+
+    def translate(self, text, context):
+        return self.server.translate(text, context)
+
+    def close(self):
+        if self.server:
+            self.server = None
+            release_llama()
+
+
+BACKENDS = {"marian": Marian, "llama": SharedLlama}
+
+ASSIST_PROMPT = """You are a writing assistant for a software developer whose first language is Spanish.
+
+- If the text is in Spanish (even partly), rewrite it in clear, natural English at a B2 level: simple sentence \
+structure, common professional vocabulary, the same meaning and tone. Fix any grammar mistakes.
+- If the text is in English, translate it into natural Mexican Spanish.
+- Keep technical terms such as ticket, sprint, backlog, pull request or deploy as developers use them.
+- Keep the original formatting (line breaks, lists).
+- Reply with the result only, without explanations or quotes."""
+
+_SPANISH_WORDS = {"el", "la", "los", "las", "de", "que", "y", "en", "un", "una", "es", "por", "para", "con", "no",
+                  "se", "lo", "del", "al", "como", "pero", "más", "este", "esta", "hay", "tengo", "quiero"}
+_ENGLISH_WORDS = {"the", "and", "is", "to", "of", "a", "in", "that", "it", "for", "you", "with", "on", "this",
+                  "are", "be", "we", "have", "not", "can", "will", "do", "i", "my", "what"}
+
+
+def looks_spanish(text):
+    """Quick guess used to label the direction in the UI (the model decides for itself)."""
+    if any(ch in text for ch in "áéíóúñ¿¡"):
+        return True
+    words = [w.strip(".,;:!?\"'()").lower() for w in text.split()]
+    return sum(w in _SPANISH_WORDS for w in words) > sum(w in _ENGLISH_WORDS for w in words)
+
+
+def assistant_model():
+    """The local LLM for the text translator: the live-translation one when it is an LLM, else the first downloaded."""
+    current = BY_ID.get(config["translation"])
+    if current and current.engine == "llama" and current.installed():
+        return current
+    return next((m for m in BY_ID.values() if m.engine == "llama" and m.installed()), None)
+
+
+class TextAssistant:
+    """Spanish → clear B2 English, or English → Spanish, for text the user pastes. Runs on worker threads."""
+
+    def __init__(self):
+        self.server = None
+        self.lock = threading.Lock()
+
+    def run(self, text, on_done, on_status):
+        """on_done(result, error) and on_status(message) are called on the GTK thread."""
+        def work():
+            try:
+                with self.lock:
+                    if self.server is None:
+                        model = assistant_model()
+                        if model is None:
+                            raise RuntimeError("Download Qwen3 4B or Gemma 3 4B in Settings → Translation")
+                        GLib.idle_add(on_status, f"Loading {model.short}…")
+                        self.server = acquire_llama(model)
+                    GLib.idle_add(on_status, "Working…")
+                    result = self.server.chat(ASSIST_PROMPT, text, max_tokens=1500, timeout=120)
+                GLib.idle_add(on_done, result, None)
+            except Exception as e:  # noqa: BLE001 - server down, out of memory, timeout…
+                GLib.idle_add(on_done, None, str(e))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def close(self):
+        with self.lock:
+            if self.server:
+                self.server = None
+                release_llama()
 
 
 class Translator(threading.Thread):

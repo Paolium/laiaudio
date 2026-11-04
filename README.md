@@ -41,6 +41,7 @@ real conversations:
 | **Real-time transcription** | NVIDIA Parakeet TDT 0.6B v2, one of the most accurate open English speech models, streaming every 0.2 s on the GPU. |
 | **Floating captions** | A minimal two-line bar on top of any window. Drag it anywhere, on any screen; it never steals focus or clicks. |
 | **Spanish translation** | Qwen3 4B or Gemma 3 4B interpret each sentence with context, in about half a second. Marian offers an instant literal mode. |
+| **Text translator** | Paste Spanish to get clear, B2-level English, or English to get Spanish, with the same local AI. |
 | **You and them** | Captures what plays on your computer (the meeting) and your microphone (you) as separate speakers, with echo suppression. |
 | **Markdown transcripts** | One file per meeting, titled, searchable and previewable inside the app. Copy everything with one click. |
 | **Hardware aware** | Detects your GPU and video memory, recommends the best combination that fits, and blocks the ones that would not. |

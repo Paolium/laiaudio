@@ -158,6 +158,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.overlay_btn.connect("toggled", lambda b: app.set_overlay_enabled(b.get_active()))
         self.es_btn = StateToggle("toggle-es", "Translate into Spanish (right column)", False, label="ES")
         self.es_btn.connect("toggled", lambda b: app.set_translation_active(b.get_active()))
+        translator_btn = Gtk.Button(icon_name="accessories-dictionary-symbolic", css_classes=["flat", "header-tool"],
+                                    tooltip_text="Translator: Spanish → clear English, English → Spanish")
+        translator_btn.connect("clicked", lambda *_: app.show_assistant())
         self.timer = Gtk.Label(label=APP_NAME, css_classes=["timer"], use_markup=True)
 
         self.sidebar_btn = Gtk.ToggleButton(icon_name="sidebar-show-symbolic", active=config["sidebar_visible"],
@@ -166,7 +169,7 @@ class MainWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar(title_widget=self.timer)
         header.pack_start(self.sidebar_btn)
         header.pack_start(self.record_btn)
-        for widget in (self.es_btn, self.overlay_btn, self.mic_btn):
+        for widget in (translator_btn, self.es_btn, self.overlay_btn, self.mic_btn):
             header.pack_end(widget)
 
         self.view = TranscriptView()
