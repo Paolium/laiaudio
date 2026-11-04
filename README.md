@@ -10,7 +10,7 @@ Real-time English transcription, an instant Spanish translation, a floating capt
 over any app, and a clean Markdown transcript when the meeting ends.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0D71FD.svg)](LICENSE)
-[![Platform: Linux](https://img.shields.io/badge/platform-Arch%20%7C%20Omarchy-0D71FD.svg)](#requirements)
+[![Platform: Linux](https://img.shields.io/badge/platform-Arch%20%7C%20Omarchy%20%7C%20Ubuntu%20%7C%20Mint-0D71FD.svg)](#requirements)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-0D71FD.svg)](pyproject.toml)
 [![100% local](https://img.shields.io/badge/AI-100%25%20local-D69D00.svg)](#privacy-first)
 
@@ -76,14 +76,17 @@ To update: `git pull && ./install.sh`.
 
 ## Requirements
 
-- **Arch Linux or Omarchy** with a Wayland compositor that supports layer-shell (Hyprland, Sway, KDE Plasma…).
-- **PipeWire** for audio (the default on Arch and Omarchy).
+- **Arch Linux / Omarchy** or **Ubuntu 24.04+ / Linux Mint 22+**.
+- **PipeWire** for audio (the default on all of them).
+- Any desktop: on Hyprland, Sway or KDE Plasma the floating captions are a true overlay (layer-shell); on GNOME
+  (Ubuntu) and X11 desktops such as Cinnamon (Mint) they are an always-on-top window. Laiaudio picks the right one.
 - **Best with an NVIDIA GPU (6 GB+).** Laiaudio is optimized for NVIDIA: transcription runs on the GPU with the most
   accurate model, and with 8 GB the translation AI runs there too. AMD, Intel and machines without a dedicated GPU
   are supported with the Lite model on the CPU.
 
-`install.sh` installs the system dependencies with pacman (GTK4, libadwaita, gtk4-layer-shell, llama.cpp with
-Vulkan), creates the Python environment and adds the app to your menu.
+`install.sh` detects your distro and installs the system dependencies with pacman or apt (GTK4, libadwaita and,
+where available, gtk4-layer-shell). It uses llama.cpp with Vulkan from the Arch repositories, or downloads the
+official llama.cpp Vulkan build on Ubuntu. Then it creates the Python environment and adds the app to your menu.
 
 ## Usage
 
@@ -122,6 +125,9 @@ the full model in only 0.7 % of the words.
 
 **Does it work with Zoom, Teams, Google Meet…?** Yes. Laiaudio listens to whatever plays on your computer, so it
 works with any app or browser, and with videos too.
+
+**Which distros are supported?** Arch / Omarchy and Ubuntu 24.04+ / Linux Mint 22+. Other distros with GTK 4.14+,
+libadwaita 1.5+ and PipeWire should work too, but `install.sh` only knows pacman and apt for now.
 
 **Can I use it on Windows or macOS?** Not yet. Laiaudio is a native GTK4 app for Linux.
 

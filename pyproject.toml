@@ -16,6 +16,7 @@ dependencies = [
     "onnx-asr",
     "ctranslate2",
     "sentencepiece",
+    "python-xlib",  # floating captions on GNOME / X11
 ]
 
 [project.optional-dependencies]

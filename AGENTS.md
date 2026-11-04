@@ -7,11 +7,13 @@ Repository-wide contract for any AI assistant or contributor. Read it before tou
 
 - Product: live meeting captions for Linux desktops, with optional Spanish translation and Markdown transcripts.
 - Promise: everything runs locally; no account, no cloud, no telemetry.
-- Platform: Arch Linux / Omarchy, Wayland with layer-shell (Hyprland first), PipeWire audio.
-- App: Python 3.11+, GTK4 + libadwaita (PyGObject), gtk4-layer-shell for the floating captions.
+- Platform: Arch Linux / Omarchy and Ubuntu 24.04+ / Linux Mint 22+, PipeWire audio. Floating captions use
+  layer-shell where the compositor supports it (Hyprland, Sway, KDE) and an always-on-top X11 window on GNOME
+  and X11 desktops (`desktop.py`).
+- App: Python 3.11+, GTK 4.14+ and libadwaita 1.5+ (PyGObject); gtk4-layer-shell or python-xlib for the overlay.
 - Speech recognition: NVIDIA Parakeet TDT 0.6B v2 through onnx-asr and ONNX Runtime (CUDA or CPU).
 - Translation: Qwen3 4B / Gemma 3 4B through llama.cpp (`llama-server`, Vulkan) or Marian through CTranslate2.
-- Distribution: `install.sh` (pacman + a Python venv); models are downloaded from inside the app.
+- Distribution: `install.sh` (pacman or apt + a Python venv); models are downloaded from inside the app.
 - Repository: `github.com/Paolium/laiaudio`, MIT license, branch `main`.
 
 ## Required reading
@@ -48,6 +50,8 @@ implementing it.
   `GLib.idle_add` (see `docs/architecture/app.md`).
 - Every model change must respect `hardware.py`: a combination that does not fit the machine must not be
   selectable.
+- Keep libadwaita 1.5 compatibility (Ubuntu 24.04): do not use widgets added in 1.6+ such as `Adw.ButtonRow`, and
+  keep the palette both as `@define-color` names and as 1.6+ CSS variables.
 - Do not put secrets in source code, documentation or committed files.
 - Do not use emojis in code, comments, documentation headings or commit messages.
 - An AI assistant never runs `git commit`, `git push` or any other git operation that changes history or the

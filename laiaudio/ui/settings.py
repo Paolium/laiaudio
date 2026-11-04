@@ -93,9 +93,6 @@ class SettingsDialog(Adw.PreferencesDialog):
         size.connect("notify::value", lambda r, _p: self.set_overlay("overlay_font_size", int(r.get_value())))
         bar.add(size)
 
-        reset = Adw.ButtonRow(title="Reset position (bottom center)")
-        reset.connect("activated", lambda *_: self.app.overlay.reset_position())
-        bar.add(reset)
         page.add(bar)
         return page
 

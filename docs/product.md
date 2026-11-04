@@ -8,7 +8,7 @@ English-speaking meetings and want to follow every word without sending their co
 
 ## Primary user
 
-A professional on a Linux desktop (Arch / Omarchy) who joins video calls in English, often as a non-native speaker,
+A professional on a Linux desktop (Arch / Omarchy, Ubuntu or Linux Mint) who joins video calls in English, often as a non-native speaker,
 and needs real-time captions, a quick translation and a written record of the meeting.
 
 ## What the app does

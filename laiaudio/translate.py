@@ -15,6 +15,7 @@ from gi.repository import GLib
 
 from .config import config
 from .models import BY_ID
+from .paths import DATA_DIR
 
 PR_SET_PDEATHSIG = 1
 
@@ -59,6 +60,12 @@ def _die_with_parent():
     libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
 
 
+def llama_server_binary():
+    """The system llama-server (Arch package) or the official build install.sh downloads (Ubuntu)."""
+    bundled = DATA_DIR / "llama.cpp" / "llama-server"
+    return shutil.which("llama-server") or (str(bundled) if bundled.exists() else None)
+
+
 def stop_leftover_servers():
     """Stop servers left alive by a previous app session."""
     subprocess.run(["pkill", "-f", f"llama-server .*--port {LlamaServer.PORT}"], check=False)
@@ -74,11 +81,12 @@ class LlamaServer:
     FREE_VRAM_MB = 1024
 
     def __init__(self, model):
-        if not shutil.which("llama-server"):
+        server = llama_server_binary()
+        if not server:
             raise RuntimeError("llama.cpp is missing (run install.sh again)")
         gguf = model.file(model.files[0][1])
         self.proc = subprocess.Popen(
-            ["llama-server", "-m", str(gguf), "--host", "127.0.0.1", "--port", str(self.PORT),
+            [server, "-m", str(gguf), "--host", "127.0.0.1", "--port", str(self.PORT),
              # No -ngl: llama.cpp puts on the GPU the layers that fit while leaving FREE_VRAM_MB free;
              # the rest goes to the CPU
              "--fit-target", str(self.FREE_VRAM_MB), "--fit-ctx", "2048",
