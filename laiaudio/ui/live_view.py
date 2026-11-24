@@ -4,9 +4,8 @@ from datetime import datetime
 
 from gi.repository import Adw, GLib, Gtk
 
-from ..transcript import MAX_PARAGRAPH
+from ..transcript import MAX_PARAGRAPH, MEETING
 
-MEETING, ME = "Meeting", "Me"
 SENTENCE_END = re.compile(r"[.?!](?=\s|$)")
 
 

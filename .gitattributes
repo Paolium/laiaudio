@@ -1,0 +1,2 @@
+# install.cmd is run by cmd.exe, which expects Windows line endings
+*.cmd text eol=crlf

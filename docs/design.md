@@ -3,6 +3,10 @@
 Laiaudio uses the Paolium dark palette with the Sapphire accent. Colors are defined once, as libadwaita CSS
 variables and component classes, in the `CSS` string of `app.py`; the color scheme is forced to dark.
 
+On Windows the same palette lives in `winui/Palette.cs` and `winui/App.xaml`, applied to native WinUI 3 controls
+(dark theme). The components below keep their look; where Windows has its own control (title bar buttons, tabs,
+switches, dialogs, notices, settings cards) the app uses it in these colors instead of imitating the libadwaita one.
+
 ## Colors
 
 | Token | Value | Use |

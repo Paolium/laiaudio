@@ -5,8 +5,7 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass, field
 
-from gi.repository import GLib
-
+from .mainloop import idle_add
 from .paths import MODELS_DIR
 
 HF = "https://huggingface.co"
@@ -113,7 +112,7 @@ def of_kind(kind):
 class Download(threading.Thread):
     """Download a model's files to .part and rename them when finished.
 
-    Notifications (progress 0–1 and completion) arrive on the GTK thread.
+    Notifications (progress 0–1 and completion) arrive on the main thread.
     """
 
     active = {}  # model id -> running Download
@@ -137,7 +136,7 @@ class Download(threading.Thread):
 
     def _notify(self, done, error=None):
         for cb in list(self.listeners):
-            GLib.idle_add(cb, self, done, error)
+            idle_add(cb, self, done, error)
 
     def run(self):
         error = None

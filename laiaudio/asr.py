@@ -1,12 +1,13 @@
 """Streaming transcription with Parakeet (onnx-asr)."""
 import queue
 import re
-import subprocess
 import threading
 import time
 
 import numpy as np
 import onnxruntime as ort
+
+from .audio import Capture
 
 RATE = 16000
 CHUNK = 0.1             # seconds read per iteration
@@ -88,11 +89,7 @@ class Stream(threading.Thread):
         self.proc = None
 
     def run(self):
-        cmd = ["parec", "--raw", "--format=float32le", f"--rate={RATE}", "--channels=1",
-               "--latency-msec=50", f"--client-name=Laiaudio ({self.speaker})"]
-        if self.device:
-            cmd.append(f"--device={self.device}")
-        self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        self.proc = Capture(self.device, f"Laiaudio ({self.speaker})", RATE)
         chunk_bytes = int(RATE * CHUNK) * 4
         interval, long_buffer = self.engine.decode_every * CHUNK, self.engine.long_buffer
 
@@ -102,7 +99,7 @@ class Stream(threading.Thread):
         pending = queue.SimpleQueue()
 
         def reader():
-            while data := self.proc.stdout.read(chunk_bytes):
+            while data := self.proc.read(chunk_bytes):
                 pending.put((time.time(), np.frombuffer(data, np.float32)))
             pending.put(None)
 
@@ -199,4 +196,4 @@ class Stream(threading.Thread):
 
     def stop(self):
         if self.proc:
-            self.proc.terminate()
+            self.proc.close()

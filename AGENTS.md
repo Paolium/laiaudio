@@ -5,15 +5,24 @@ Repository-wide contract for any AI assistant or contributor. Read it before tou
 
 ## Quick context
 
-- Product: live meeting captions for Linux desktops, with optional Spanish translation and Markdown transcripts.
+- Product: live meeting captions for Linux desktops and Windows 11, with optional Spanish translation and Markdown
+  transcripts.
 - Promise: everything runs locally; no account, no cloud, no telemetry.
-- Platform: Arch Linux / Omarchy and Ubuntu 24.04+ / Linux Mint 22+, PipeWire audio. Floating captions use
-  layer-shell where the compositor supports it (Hyprland, Sway, KDE) and an always-on-top X11 window on GNOME
-  and X11 desktops (`desktop.py`).
-- App: Python 3.11+, GTK 4.14+ and libadwaita 1.5+ (PyGObject); gtk4-layer-shell or python-xlib for the overlay.
+- Platform: Arch Linux / Omarchy with PipeWire audio, and Windows 11 (x64) with
+  WASAPI audio. Floating captions use layer-shell where the compositor supports it (Hyprland, Sway, KDE), an
+  always-on-top X11 window on GNOME and X11 desktops (`desktop.py`), and a topmost window of the native app on
+  Windows.
+- One engine, two interfaces: the Python engine (audio, recognition, translation, models, settings and hardware
+  rules) is shared. Linux uses the GTK app (`app.py`, `ui/`); Windows uses a native WinUI 3 app (`winui/`, C#) that
+  drives the engine through `service.py` (see `docs/architecture/windows.md`). Windows-only Python lives in
+  `windows.py` (Win32) and `wasapi.py` (audio) and is reached through `desktop.WINDOWS` checks.
+- App: Python 3.11+, GTK 4.16+ and libadwaita 1.6+ (PyGObject); gtk4-layer-shell or python-xlib for the overlay.
+  On Windows: Python 3.14 (private to the app) and WinUI 3 (Windows App SDK 1.8, .NET 10), self-contained.
 - Speech recognition: NVIDIA Parakeet TDT 0.6B v2 through onnx-asr and ONNX Runtime (CUDA or CPU).
 - Translation: Qwen3 4B / Gemma 3 4B through llama.cpp (`llama-server`, Vulkan) or Marian through CTranslate2.
-- Distribution: `install.sh` (pacman or apt + a Python venv); models are downloaded from inside the app.
+- Distribution: `install.sh` on Arch (pacman + a Python venv) and `install.ps1` / `install.cmd` on Windows (no admin
+  rights; private Python and venv, and the app built with a temporary .NET SDK); models are downloaded from inside
+  the app.
 - Repository: `github.com/Paolium/laiaudio`, MIT license, branch `main`.
 
 ## Required reading
@@ -24,6 +33,7 @@ Read only the documents relevant to the change, starting with `README.md`:
 - `docs/product.md`: product scope, users, principles and non-goals.
 - `docs/architecture/system.md`: components, threads and data flow from audio to captions.
 - `docs/architecture/app.md`: module map, UI structure, state and the rules each module follows.
+- `docs/architecture/windows.md`: the native Windows app, its engine process and the protocol between them.
 - `docs/models.md`: model catalog, hardware detection, VRAM budget and the measurements behind them.
 - `docs/design.md`: visual design system: palette, typography, components and states.
 - `docs/branding.md`: Paolium brand assets and how Laiaudio uses them.
@@ -50,8 +60,12 @@ implementing it.
   `GLib.idle_add` (see `docs/architecture/app.md`).
 - Every model change must respect `hardware.py`: a combination that does not fit the machine must not be
   selectable.
-- Keep libadwaita 1.5 compatibility (Ubuntu 24.04): do not use widgets added in 1.6+ such as `Adw.ButtonRow`, and
-  keep the palette both as `@define-color` names and as 1.6+ CSS variables.
+- Every change must keep working on Linux and Windows. Put Win32 or WASAPI code in `windows.py` or `wasapi.py`, never
+  in UI modules; console programs started on Windows use `desktop.NO_CONSOLE`.
+- A rule of the interface (what a page shows, when a button is enabled, how the captions wrap) exists twice: in
+  `ui/` and in its C# port in `winui/`. Change both. Rules of the engine live only in Python, and the Windows app
+  never decides them (it asks `service.py`).
+- On Windows use native WinUI controls with the Paolium palette; do not draw controls that Windows already provides.
 - Do not put secrets in source code, documentation or committed files.
 - Do not use emojis in code, comments, documentation headings or commit messages.
 - An AI assistant never runs `git commit`, `git push` or any other git operation that changes history or the
@@ -64,6 +78,8 @@ implementing it.
 - Launcher: `~/.local/bin/laiaudio`; desktop entry `laiaudio.desktop`; icon `laiaudio.svg`.
 - Data: `~/.local/share/laiaudio/` (venv and models), `~/.config/laiaudio/config.json`, `~/.cache/laiaudio/app.log`.
 - Default transcript folder: `~/Documents/Laiaudio/`.
+- Windows: `%LOCALAPPDATA%\Laiaudio\` (`app\Laiaudio.exe`, Python, venv, llama.cpp, models and `app.log`),
+  `%APPDATA%\Laiaudio\config.json`, Start menu and desktop shortcuts, and an entry in Settings > Apps.
 - Brand site: `https://paolium.web.app/`.
 
 ## AI workflow and verification

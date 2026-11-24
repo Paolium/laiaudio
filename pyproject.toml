@@ -10,17 +10,18 @@ readme = "README.md"
 license = "MIT"
 authors = [{ name = "Paolium" }]
 requires-python = ">=3.11"
-# GTK4, libadwaita and gtk4-layer-shell come from the system (install.sh installs them with pacman)
+# GTK4, libadwaita and PyGObject come from the system on Linux (install.sh) and from the gvsbuild runtime on
+# Windows (install.ps1)
 dependencies = [
     "numpy",
     "onnx-asr",
     "ctranslate2",
     "sentencepiece",
-    "python-xlib",  # floating captions on GNOME / X11
+    "python-xlib; sys_platform == 'linux'",  # floating captions on GNOME / X11
 ]
 
 [project.optional-dependencies]
-# install.sh picks one depending on whether there is an NVIDIA GPU
+# install.sh and install.ps1 pick one depending on whether there is an NVIDIA GPU
 nvidia = ["onnxruntime-gpu[cuda,cudnn]"]
 cpu = ["onnxruntime"]
 
@@ -32,4 +33,4 @@ Paolium = "https://paolium.web.app/"
 include = ["laiaudio*"]
 
 [tool.setuptools.package-data]
-laiaudio = ["data/*.svg"]
+laiaudio = ["data/*.svg", "data/*.ico"]

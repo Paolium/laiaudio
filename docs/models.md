@@ -15,8 +15,10 @@ Downloads come from Hugging Face (and Argos for Marian), are written to `.part` 
 
 ## Hardware rules (`hardware.py`)
 
-- NVIDIA is detected with `nvidia-smi`; AMD through `/sys/class/drm/*/device/mem_info_vram_total`; integrated
-  GPUs count as "no dedicated GPU".
+- NVIDIA is detected with `nvidia-smi` (Linux and Windows); AMD through `/sys/class/drm/*/device/mem_info_vram_total`
+  on Linux, and AMD or Intel Arc through the display driver's `HardwareInformation.qwMemorySize` in the registry on
+  Windows (WMI caps it at 4 GB); integrated GPUs count as "no dedicated GPU".
+- The 1.5 GB desktop reserve also holds on Windows 11: 1.58 GB in use with a browser, VS Code and the usual apps.
 - Budget for models = total VRAM − 1.5 GB (desktop and browser) − 1 GB kept free.
 - A model needing CUDA is blocked without NVIDIA. A GPU model is blocked without a dedicated GPU, or when it does
   not fit the budget together with the other selected model.

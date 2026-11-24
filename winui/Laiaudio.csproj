@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The native Windows 11 app: WinUI 3 window and controls; the engine is the Python service (laiaudio.service) -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
+    <RootNamespace>Laiaudio</RootNamespace>
+    <AssemblyName>Laiaudio</AssemblyName>
+    <Version>1.0.0</Version>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <!-- Unpackaged and self-contained: install.ps1 builds it into %LOCALAPPDATA%\Laiaudio\app, nothing else to install -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Also for an unpackaged app: without it, publish leaves out the compiled XAML resources (resources.pri) -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <SelfContained>true</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\laiaudio\data\laiaudio.ico</ApplicationIcon>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\laiaudio\data\paolium-logo.svg" Link="Assets\paolium-logo.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\laiaudio\data\laiaudio.ico" Link="Assets\laiaudio.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

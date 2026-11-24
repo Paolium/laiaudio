@@ -1,12 +1,18 @@
 """Desktop detection: decides how the floating captions are drawn on this session.
 
 Compositors with layer-shell (Hyprland, Sway, KDE Plasma, wlroots…) get a real overlay surface. GNOME and X11
-sessions (Ubuntu, Linux Mint) do not support layer-shell, so the whole app runs through X11 (XWayland on GNOME)
-and the captions use an undecorated "always on top" X11 window instead.
+sessions (Cinnamon, Xfce…) do not support layer-shell, so the whole app runs through X11 (XWayland on GNOME)
+and the captions use an undecorated "always on top" X11 window instead. On Windows the native app (winui/) draws
+the whole UI, so only `WINDOWS` and `NO_CONSOLE` apply there.
 """
 import os
+import subprocess
+import sys
 
 LAYER_SHELL, X11 = "layer-shell", "x11"
+WINDOWS = sys.platform == "win32"
+# Console programs (nvidia-smi, llama-server) started from the app must not open a console window on Windows
+NO_CONSOLE = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _NO_LAYER_SHELL = ("gnome", "unity", "cinnamon", "budgie", "pantheon", "mate", "xfce")
 
 

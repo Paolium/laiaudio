@@ -10,7 +10,7 @@ Real-time English transcription, an instant Spanish translation, a floating capt
 over any app, and a clean Markdown transcript when the meeting ends.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0D71FD.svg)](LICENSE)
-[![Platform: Linux](https://img.shields.io/badge/platform-Arch%20%7C%20Omarchy%20%7C%20Ubuntu%20%7C%20Mint-0D71FD.svg)](#requirements)
+[![Platform: Windows 11 and Arch Linux](https://img.shields.io/badge/platform-Windows%2011%20%7C%20Arch%20%7C%20Omarchy-0D71FD.svg)](#install)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-0D71FD.svg)](pyproject.toml)
 [![100% local](https://img.shields.io/badge/AI-100%25%20local-D69D00.svg)](#privacy-first)
 
@@ -62,32 +62,73 @@ Laiaudio was designed for work meetings, where conversations are confidential.
   model download from Hugging Face (and Argos for Marian).
 - **No accounts, no analytics, no telemetry.** The source code is open, so you can verify every line.
 
-## Quick start
+## Install
+
+Laiaudio runs on **Windows 11** and on **Arch Linux / Omarchy**. Pick your system and follow the steps; it takes a
+few minutes. The AI models are downloaded from inside the app the first time you open it.
+
+### Windows 11
+
+1. **Download** Laiaudio: [**laiaudio-main.zip**](https://github.com/Paolium/laiaudio/archive/refs/heads/main.zip).
+2. **Extract** it: right-click the ZIP in your Downloads folder → **Extract All…** → **Extract**.
+3. **Install**: open the extracted `laiaudio-main` folder and double-click **`install.cmd`**.
+   - If Windows says *"Windows protected your PC"*, click **More info** → **Run anyway**.
+   - A black window shows the progress. It takes one or two minutes; when it says *"Done"*, press any key to close it.
+   - No administrator rights are needed. Windows only asks for permission once if the Microsoft Visual C++
+     runtime is missing.
+4. **Open** Laiaudio from the **Start menu** or the **desktop shortcut**. The first time, press **Download** to get
+   the transcription model recommended for your computer.
+
+You can delete the ZIP and the extracted folder afterwards: everything Laiaudio needs is in
+`%LOCALAPPDATA%\Laiaudio` (about 2.3 GB with an NVIDIA GPU, 0.7 GB without one, plus the models). It never touches
+your system Python or your PATH.
+
+- **Update:** download the ZIP again, extract it and double-click `install.cmd`. Your meetings, settings and
+  models are kept.
+- **Uninstall:** **Settings → Apps → Installed apps → Laiaudio → Uninstall**.
+
+### Arch Linux / Omarchy
+
+Open a terminal and run:
 
 ```bash
+sudo pacman -S --needed git
 git clone https://github.com/Paolium/laiaudio.git
 cd laiaudio
 ./install.sh
 ```
 
-Open **Laiaudio** from your app menu (or run `laiaudio`). The first time, it offers to download the transcription
-model recommended for your machine. That is all.
+It asks for your password once, to install the system packages with pacman. Then open **Laiaudio** from your app
+menu (or run `laiaudio`). The first time, press **Download** to get the transcription model recommended for your
+computer.
 
-To update: `git pull && ./install.sh`.
+Keep the `laiaudio` folder: you use it to update and uninstall.
+
+- **Update:** in the `laiaudio` folder, run `git pull && ./install.sh`.
+- **Uninstall:** in the `laiaudio` folder, run `./uninstall.sh`.
+
+When uninstalling, on both systems, it asks whether to delete the downloaded models and your settings too. Your
+transcripts are never deleted.
 
 ## Requirements
 
-- **Arch Linux / Omarchy** or **Ubuntu 24.04+ / Linux Mint 22+**.
-- **PipeWire** for audio (the default on all of them).
-- Any desktop: on Hyprland, Sway or KDE Plasma the floating captions are a true overlay (layer-shell); on GNOME
-  (Ubuntu) and X11 desktops such as Cinnamon (Mint) they are an always-on-top window. Laiaudio picks the right one.
+- **Windows 11** (64-bit Intel or AMD processor), or **Arch Linux / Omarchy** with **PipeWire** for audio (the
+  default).
 - **Best with an NVIDIA GPU (6 GB+).** Laiaudio is optimized for NVIDIA: transcription runs on the GPU with the most
   accurate model, and with 8 GB the translation AI runs there too. AMD, Intel and machines without a dedicated GPU
   are supported with the Lite model on the CPU.
+- Free disk space: about 8 GB with an NVIDIA GPU and the full models, 2 GB with the Lite model and Marian.
+- Floating captions: on Windows they float above every window and let your clicks pass through. On Linux they are a
+  true overlay on Hyprland, Sway and KDE Plasma (layer-shell) and an always-on-top window on GNOME and X11 desktops.
+  Laiaudio picks the right one.
 
-`install.sh` detects your distro and installs the system dependencies with pacman or apt (GTK4, libadwaita and,
-where available, gtk4-layer-shell). It uses llama.cpp with Vulkan from the Arch repositories, or downloads the
-official llama.cpp Vulkan build on Ubuntu. Then it creates the Python environment and adds the app to your menu.
+### What the installers do
+
+- `install.cmd` runs `install.ps1`: a private Python 3.14, the official llama.cpp Vulkan build, the Python
+  environment, the native Windows app (built on your machine with a .NET SDK that it removes afterwards), Start menu
+  and desktop shortcuts, and an entry in **Settings → Apps** to uninstall it.
+- `install.sh` installs the system packages with pacman (GTK4, libadwaita, gtk4-layer-shell, PipeWire tools and
+  llama.cpp with Vulkan), creates the Python environment in `~/.local/share/laiaudio` and adds the app to your menu.
 
 ## Usage
 
@@ -127,21 +168,19 @@ the full model in only 0.7 % of the words.
 **Does it work with Zoom, Teams, Google Meet…?** Yes. Laiaudio listens to whatever plays on your computer, so it
 works with any app or browser, and with videos too.
 
-**Which distros are supported?** Arch / Omarchy and Ubuntu 24.04+ / Linux Mint 22+. Other distros with GTK 4.14+,
-libadwaita 1.5+ and PipeWire should work too, but `install.sh` only knows pacman and apt for now.
+**Which systems are supported?** Windows 11 and Arch Linux / Omarchy. Other Linux distributions are not
+supported yet.
 
-**Can I use it on Windows or macOS?** Not yet. Laiaudio is a native GTK4 app for Linux.
+**Is the Windows version different?** It has the same pages, models, settings and rules, and the same engine. Its
+window is a native Windows 11 app (WinUI 3): Windows' own title bar buttons and Snap Layouts, native controls,
+ClearType text and GPU drawing, with the same Paolium colors. On Linux it is a GTK and libadwaita app.
+
+**Can I use it on macOS?** Not yet.
 
 **Where are my files?** Transcripts in `~/Documents/Laiaudio/` (configurable), settings in
 `~/.config/laiaudio/`, models in `~/.local/share/laiaudio/models/` and the log in `~/.cache/laiaudio/app.log`.
-
-## Uninstall
-
-```bash
-./uninstall.sh
-```
-
-It removes the app and asks whether to delete the models and settings too. Your transcripts are never deleted.
+On Windows: transcripts in `Documents\Laiaudio`, settings in `%APPDATA%\Laiaudio`, and models and the log
+(`app.log`) in `%LOCALAPPDATA%\Laiaudio`.
 
 ## Contributing
 

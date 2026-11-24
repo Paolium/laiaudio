@@ -3,6 +3,7 @@ import threading
 from datetime import datetime
 
 MAX_PARAGRAPH = 600  # characters per paragraph before starting a new one
+MEETING, ME = "Meeting", "Me"  # speakers: what plays on the output, and the microphone
 
 
 class Transcript:

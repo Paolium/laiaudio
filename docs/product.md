@@ -8,7 +8,8 @@ English-speaking meetings and want to follow every word without sending their co
 
 ## Primary user
 
-A professional on a Linux desktop (Arch / Omarchy, Ubuntu or Linux Mint) who joins video calls in English, often as a non-native speaker,
+A professional on a Linux desktop (Arch Linux / Omarchy) or on Windows 11 who joins video calls in
+English, often as a non-native speaker,
 and needs real-time captions, a quick translation and a written record of the meeting.
 
 ## What the app does
@@ -34,4 +35,4 @@ and needs real-time captions, a quick translation and a written record of the me
 - Cloud transcription or translation, accounts, sync or analytics.
 - Speaker diarization (telling meeting participants apart). The app separates "Meeting" and "Me" only.
 - Languages other than English speech and Spanish translation (for now).
-- Windows or macOS builds.
+- macOS builds. (Windows 11 is supported with the same pages and rules as Linux, as a native Windows app.)

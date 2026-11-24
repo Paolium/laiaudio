@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="Laiaudio.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedTheme="Dark">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Paolium dark palette (docs/design.md) with the Sapphire accent on the native controls -->
+            <Color x:Key="SystemAccentColor">#0D71FD</Color>
+            <Color x:Key="SystemAccentColorLight1">#3D8BFD</Color>
+            <Color x:Key="SystemAccentColorLight2">#5C9DFE</Color>
+            <Color x:Key="SystemAccentColorLight3">#93BEFE</Color>
+            <Color x:Key="SystemAccentColorDark1">#0A5ACB</Color>
+            <Color x:Key="SystemAccentColorDark2">#084499</Color>
+            <Color x:Key="SystemAccentColorDark3">#052D66</Color>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

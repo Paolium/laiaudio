@@ -1,7 +1,8 @@
 """Floating caption bar: only the drag handle receives clicks, to move it.
 
 Two placements share the same text logic: layer-shell (Hyprland, Sway, KDE…) and an "always on top" X11 window
-(GNOME on Ubuntu, X11 sessions such as Linux Mint). `create_overlay` picks the one this session supports.
+(GNOME and X11 sessions). `create_overlay` picks the one this session supports. On Windows
+the native app draws the captions (winui/CaptionsWindow.cs).
 """
 import json
 import os
@@ -25,6 +26,11 @@ def create_overlay(app):
     if desktop.overlay_backend() == desktop.LAYER_SHELL:
         return LayerShellOverlay(app)
     return X11Overlay(app)
+
+
+def monitor_name(mon):
+    """How a screen is identified in the settings: its connector (DP-1…), or its model when it has none."""
+    return mon.get_connector() or mon.get_model() or mon.get_description() or "Screen"
 
 
 class Overlay(Gtk.Window):
@@ -68,7 +74,7 @@ class Overlay(Gtk.Window):
 
     def default_monitor(self):
         mons = self.monitors()
-        return next((m for m in mons if m.get_connector() == config["overlay_monitor"]), mons[0])
+        return next((m for m in mons if monitor_name(m) == config["overlay_monitor"]), mons[0])
 
     def bar_size(self):
         return self.get_width() or self.APPROX_WIDTH, self.get_height() or 80
@@ -278,8 +284,8 @@ class LayerShellOverlay(Overlay):
                                             "left": int(self.left), "bottom": int(self.bottom)})
 
 
-class X11Overlay(Overlay):
-    """Undecorated, always-on-top X11 window (GNOME through XWayland, or any X11 session).
+class WindowOverlay(Overlay):
+    """Undecorated, always-on-top window, for desktops without layer-shell (the X11 placement).
 
     The window manager moves it while the handle is dragged; its position is read back and saved.
     """
@@ -295,13 +301,101 @@ class X11Overlay(Overlay):
         self.connect("realize", lambda *_: self.mark_as_overlay())
         self.connect("map", lambda *_: GLib.timeout_add(50, self.place))
         self.connect("unmap", lambda *_: self.on_unmap())
-        self.xdisplay = self.xwin = None
-        self.position = None  # (x, y) on the X11 root window
+        self.position = None  # (x, y) on the whole desktop, in the window manager's coordinates
         self.placed = False   # do not read the position back until the bar has been placed
         GLib.timeout_add(1000, self.track_position)
 
+    # --- what each window system provides ---
     def mark_as_overlay(self):
         """Ask the window manager to keep the bar above everything, on every workspace, out of the taskbar."""
+        raise NotImplementedError
+
+    def ready(self):
+        """Whether the window manager already knows the bar (after mark_as_overlay)."""
+        raise NotImplementedError
+
+    def reassert_states(self):
+        raise NotImplementedError
+
+    def centered_on(self, mon):
+        raise NotImplementedError
+
+    def move(self, x, y):
+        raise NotImplementedError
+
+    def current_position(self):
+        raise NotImplementedError
+
+    # --- shared ---
+    @staticmethod
+    def saved_position():
+        saved = config["overlay_position"] or {}
+        return (saved["x"], saved["y"]) if "x" in saved else None
+
+    def place(self):
+        if not self.ready():
+            return False
+        self.position = self.position or self.saved_position() or self.centered_on(self.default_monitor())
+        self.move(*self.position)
+        self.reassert_states()
+        self.update_input_region()
+        GLib.timeout_add(500, self.mark_placed)
+        return False
+
+    def mark_placed(self):
+        self.placed = True
+        return False
+
+    def move_to_monitor(self, connector=None):
+        mons = self.monitors()
+        mon = next((m for m in mons if monitor_name(m) == connector), mons[0])
+        self.position = self.centered_on(mon)
+        self.save_position()
+        if self.ready() and self.get_mapped():
+            self.move(*self.position)
+        self.preview()
+
+    def on_unmap(self):
+        self.placed = False
+
+    def on_handle_pressed(self, gesture, _n_press, x, y):
+        ok, point = self.handle.compute_point(self, self.handle_point(x, y))
+        surface = self.get_surface()
+        if ok and surface:
+            surface.begin_move(gesture.get_device(), Gdk.BUTTON_PRIMARY, point.x, point.y,
+                               gesture.get_current_event_time())
+
+    @staticmethod
+    def handle_point(x, y):
+        from gi.repository import Graphene
+
+        return Graphene.Point().init(x, y)
+
+    def track_position(self):
+        """Save where the user dropped the bar (the window manager moved it, so read it back)."""
+        if self.ready() and self.placed and self.get_mapped():
+            position = self.current_position()
+            if position != self.position:
+                self.position = position
+                self.save_position()
+        return True
+
+    def save_position(self):
+        if self.position:
+            config.set("overlay_position", {"x": int(self.position[0]), "y": int(self.position[1])})
+
+
+class X11Overlay(WindowOverlay):
+    """X11 window (GNOME through XWayland, or any X11 session) marked above, sticky and out of the taskbar."""
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.xdisplay = self.xwin = None
+
+    def ready(self):
+        return bool(self.xwin)
+
+    def mark_as_overlay(self):
         from Xlib import Xatom
         from Xlib import display as xdisplay
 
@@ -336,25 +430,6 @@ class X11Overlay(Overlay):
             root.send_event(message, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
         self.xdisplay.flush()
 
-    @staticmethod
-    def saved_position():
-        saved = config["overlay_position"] or {}
-        return (saved["x"], saved["y"]) if "x" in saved else None
-
-    def place(self):
-        if not self.xwin:
-            return False
-        self.position = self.position or self.saved_position() or self.centered_on(self.default_monitor())
-        self.move(*self.position)
-        self.reassert_states()
-        self.update_input_region()
-        GLib.timeout_add(500, self.mark_placed)
-        return False
-
-    def mark_placed(self):
-        self.placed = True
-        return False
-
     def centered_on(self, mon):
         g = mon.get_geometry()
         w, h = self.bar_size()
@@ -373,42 +448,6 @@ class X11Overlay(Overlay):
         self.xwin.configure(x=int(x), y=int(y))  # for window managers without EWMH
         self.xdisplay.flush()
 
-    def move_to_monitor(self, connector=None):
-        mons = self.monitors()
-        mon = next((m for m in mons if m.get_connector() == connector), mons[0])
-        self.position = self.centered_on(mon)
-        self.save_position()
-        if self.xwin and self.get_mapped():
-            self.move(*self.position)
-        self.preview()
-
-    def on_unmap(self):
-        self.placed = False
-
-    def on_handle_pressed(self, gesture, _n_press, x, y):
-        ok, point = self.handle.compute_point(self, self.handle_point(x, y))
-        surface = self.get_surface()
-        if ok and surface:
-            surface.begin_move(gesture.get_device(), Gdk.BUTTON_PRIMARY, point.x, point.y,
-                               gesture.get_current_event_time())
-
-    @staticmethod
-    def handle_point(x, y):
-        from gi.repository import Graphene
-
-        return Graphene.Point().init(x, y)
-
-    def track_position(self):
-        """Save where the user dropped the bar (the window manager moved it, so read it back)."""
-        if self.xwin and self.placed and self.get_mapped():
-            root = self.xdisplay.screen().root
-            coords = self.xwin.translate_coords(root, 0, 0)
-            position = (-coords.x, -coords.y)
-            if position != self.position:
-                self.position = position
-                self.save_position()
-        return True
-
-    def save_position(self):
-        if self.position:
-            config.set("overlay_position", {"x": int(self.position[0]), "y": int(self.position[1])})
+    def current_position(self):
+        coords = self.xwin.translate_coords(self.xdisplay.screen().root, 0, 0)
+        return -coords.x, -coords.y

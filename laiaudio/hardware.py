@@ -4,6 +4,8 @@ import subprocess
 from dataclasses import dataclass
 from functools import cache
 
+from .desktop import NO_CONSOLE, WINDOWS
+
 DESKTOP_MB = 1536  # desktop, browser and open apps (measured ~1.5 GB on an Omarchy PC)
 FREE_MB = 1024     # kept free on top of that for videos and the rest (like LlamaServer.FREE_VRAM_MB)
 
@@ -28,12 +30,15 @@ class Hardware:
 def detect():
     try:  # NVIDIA
         out = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
-                             capture_output=True, text=True, timeout=5).stdout.strip().splitlines()
+                             capture_output=True, text=True, timeout=5,
+                             creationflags=NO_CONSOLE).stdout.strip().splitlines()
         if out:
             name, mb = out[0].rsplit(",", 1)
             return Hardware(name.strip(), int(mb), True)
     except (OSError, ValueError, subprocess.SubprocessError):
         pass
+    if WINDOWS:
+        return _windows_gpu()
     for path in glob.glob("/sys/class/drm/card*/device/mem_info_vram_total"):  # AMD (amdgpu)
         try:
             mb = int(open(path).read()) // 2**20
@@ -42,6 +47,28 @@ def detect():
         if mb >= 1024:  # integrated GPUs report a few hundred MB
             return Hardware("AMD GPU", mb, False)
     return Hardware("", 0, False)  # no dedicated GPU (e.g. Intel integrated graphics)
+
+
+def _windows_gpu():
+    """AMD or Intel Arc on Windows: the dedicated memory the display driver reports (WMI caps it at 4 GB)."""
+    import winreg
+
+    display_class = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    best = Hardware("", 0, False)
+    try:
+        adapters = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, display_class)
+    except OSError:
+        return best
+    for i in range(winreg.QueryInfoKey(adapters)[0]):
+        try:
+            with winreg.OpenKey(adapters, winreg.EnumKey(adapters, i)) as key:
+                name = winreg.QueryValueEx(key, "DriverDesc")[0]
+                mb = int(winreg.QueryValueEx(key, "HardwareInformation.qwMemorySize")[0]) // 2**20
+        except (OSError, ValueError, TypeError):
+            continue
+        if mb >= 1024 and mb > best.vram_mb:  # integrated GPUs report a few hundred MB
+            best = Hardware(name, mb, False)
+    return best
 
 
 def problem(model, other, hw=None):

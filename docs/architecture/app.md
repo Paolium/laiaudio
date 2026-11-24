@@ -2,15 +2,22 @@
 
 ## Module map
 
+On Windows the interface is the native app in `winui/` and the engine runs as `service.py`: see
+[windows.md](windows.md). Everything below `ui/` and `app.py` is the Linux interface.
+
 ```
 laiaudio/
   __init__.py        app name, id, version and brand links
   __main__.py        entry point (python -m laiaudio)
-  app.py             Adw.Application: wiring, recording lifecycle, CSS
-  paths.py           XDG paths (LAIAUDIO_MODELS overrides the models folder for testing)
-  desktop.py         picks the overlay backend (layer-shell or X11) before GTK starts
+  app.py             Adw.Application (Linux): wiring, recording lifecycle, CSS
+  service.py         Windows: the same engine without a UI, driven by the WinUI app (JSON lines on stdin/stdout)
+  mainloop.py        idle_add: GLib in the GTK app, a plain queue in the service
+  paths.py           XDG paths, or AppData on Windows (LAIAUDIO_MODELS overrides the models folder for testing)
+  desktop.py         WINDOWS and NO_CONSOLE; picks the overlay backend (layer-shell or X11) before GTK starts
+  windows.py         Windows only: the Documents folder and the job object that ties llama-server to the engine
+  wasapi.py          Windows only: audio devices and capture through WASAPI (COM with ctypes)
   config.py          settings in config.json, first-run recommendation, hardware fix-ups
-  audio.py           PipeWire sources
+  audio.py           audio sources and Capture (PipeWire on Linux, WASAPI on Windows)
   asr.py             Engine and Stream (speech recognition)
   translate.py       Translator and its backends (llama-server, Marian)
   transcript.py      Markdown writer
@@ -28,6 +35,8 @@ laiaudio/
     widgets.py       StateToggle (colored icon on, slashed icon off) and icon_button
   data/
     paolium-logo.svg app icon and sidebar logo
+    laiaudio.ico     Windows app icon
+winui/               the Windows app (WinUI 3, C#): see windows.md
 ```
 
 ## UI structure
@@ -49,7 +58,8 @@ laiaudio/
 
 ## Rules
 
-- `app.py` owns the recording lifecycle and is the only place that starts or stops streams.
+- `app.py` (and `service.py` on Windows) owns the recording lifecycle and is the only place that starts or stops
+  streams.
 - Stream events (`partial`, `committed`) arrive on worker threads and must hop to the main thread with
   `GLib.idle_add` before touching widgets.
 - Never change a widget's model or selection inside its own `notify` handler: GTK notifies again and creates an
@@ -59,16 +69,17 @@ laiaudio/
 
 ## Floating captions per desktop
 
-`desktop.overlay_backend()` decides once, before GTK starts (`LAIAUDIO_OVERLAY=layer-shell|x11` overrides it):
+`desktop.overlay_backend()` decides once, before GTK starts (`LAIAUDIO_OVERLAY=layer-shell|x11` overrides it on
+Linux). `X11Overlay` is a `WindowOverlay`: a normal undecorated window that the window manager moves, whose position
+is read back and saved as `{"x", "y"}`. On Windows the WinUI app draws the captions (`CaptionsWindow.cs`).
 
 | Session | Backend | How it is placed and moved |
 | --- | --- | --- |
 | Hyprland, Sway, KDE Plasma, other wlroots compositors | `LayerShellOverlay` | Layer-shell margins; drag follows the Hyprland cursor and jumps to another screen on drop. |
-| GNOME (Ubuntu), Cinnamon (Mint) and any X11 session | `X11Overlay` | The whole app runs on the X11 backend (XWayland on GNOME). Undecorated utility window marked above, sticky and out of the taskbar; positioned with `USPosition` and `_NET_MOVERESIZE_WINDOW`, dragged by the window manager (`begin_move`) and its position read back and saved. |
+| GNOME, Cinnamon and any X11 session | `X11Overlay` | The whole app runs on the X11 backend (XWayland on GNOME). Undecorated utility window marked above, sticky and out of the taskbar; positioned with `USPosition` and `_NET_MOVERESIZE_WINDOW`, dragged by the window manager (`begin_move`) and its position read back and saved. |
 
-Both share the text logic and the click-through input region (only the drag handle receives clicks).
-Verified under Mutter 46 (Ubuntu 24.04): starts centered at the bottom, drags with the mouse and remembers the
-position.
+Both share the text logic. The click-through comes from the input region: only the drag handle receives clicks.
+Verified under Mutter 46 (GNOME): starts centered at the bottom, drags with the mouse and remembers the position.
 - The floating bar uses fixed-width lines and never shrinks mid-sentence; it accepts corrections of equal or
   greater length only.
 - Models are selected only through `SettingsView`, which consults `hardware.problem()`; `config.fit_to_hardware()`

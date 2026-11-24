@@ -11,9 +11,9 @@ import threading
 import time
 import urllib.request
 
-from gi.repository import GLib
-
 from .config import config
+from .desktop import NO_CONSOLE, WINDOWS
+from .mainloop import idle_add
 from .models import BY_ID
 from .paths import DATA_DIR
 
@@ -61,13 +61,17 @@ def _die_with_parent():
 
 
 def llama_server_binary():
-    """The system llama-server (Arch package) or the official build install.sh downloads (Ubuntu)."""
-    bundled = DATA_DIR / "llama.cpp" / "llama-server"
+    """The system llama-server (Arch package) or, on Windows, the official build install.ps1 downloads."""
+    bundled = DATA_DIR / "llama.cpp" / ("llama-server.exe" if WINDOWS else "llama-server")
+    if WINDOWS and bundled.exists():  # the build install.ps1 pins comes first
+        return str(bundled)
     return shutil.which("llama-server") or (str(bundled) if bundled.exists() else None)
 
 
 def stop_leftover_servers():
     """Stop servers left alive by a previous app session."""
+    if WINDOWS:
+        return  # Windows already killed it: it was in the app's job object (see windows.kill_with_app)
     subprocess.run(["pkill", "-f", f"llama-server .*--port {LlamaServer.PORT}"], check=False)
 
 
@@ -83,7 +87,7 @@ class LlamaServer:
     def __init__(self, model):
         server = llama_server_binary()
         if not server:
-            raise RuntimeError("llama.cpp is missing (run install.sh again)")
+            raise RuntimeError(f"llama.cpp is missing (run {'install.ps1' if WINDOWS else 'install.sh'} again)")
         gguf = model.file(model.files[0][1])
         self.proc = subprocess.Popen(
             [server, "-m", str(gguf), "--host", "127.0.0.1", "--port", str(self.PORT),
@@ -94,7 +98,12 @@ class LlamaServer:
             # No "host-visible" video memory: on GPUs without Resizable BAR that window is only 256 MB and,
             # if the AI fills it, the browser cannot play video and crashes
             env={**os.environ, "GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM": "1"},
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=_die_with_parent)
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=NO_CONSOLE,
+            preexec_fn=None if WINDOWS else _die_with_parent)
+        if WINDOWS:
+            from .windows import kill_with_app
+
+            kill_with_app(self.proc.pid)
         atexit.register(self.close)
         for _ in range(240):  # wait for the model to load
             if self.proc.poll() is not None:
@@ -246,7 +255,7 @@ class TextAssistant:
         self.lock = threading.Lock()
 
     def run(self, text, on_done, on_status):
-        """on_done(result, error) and on_status(message) are called on the GTK thread."""
+        """on_done(result, error) and on_status(message) are called on the main thread."""
         def work():
             try:
                 with self.lock:
@@ -254,13 +263,13 @@ class TextAssistant:
                         model = assistant_model()
                         if model is None:
                             raise RuntimeError("Download Qwen3 4B or Gemma 3 4B in Settings → Translation")
-                        GLib.idle_add(on_status, f"Loading {model.short}…")
+                        idle_add(on_status, f"Loading {model.short}…")
                         self.server = acquire_llama(model)
-                    GLib.idle_add(on_status, "Working…")
+                    idle_add(on_status, "Working…")
                     result = self.server.chat(ASSIST_PROMPT, text, max_tokens=1500, timeout=120)
-                GLib.idle_add(on_done, result, None)
+                idle_add(on_done, result, None)
             except Exception as e:  # noqa: BLE001 - server down, out of memory, timeout…
-                GLib.idle_add(on_done, None, str(e))
+                idle_add(on_done, None, str(e))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -353,7 +362,7 @@ class Translator(threading.Thread):
                 # the ones that already waited too long go literal (Marian, ~0.1 s) to stay current
                 late = time.time() - queued > self.MAX_WAIT
                 if translation := self.translate_one(text, literal=late):
-                    GLib.idle_add(callback, translation)
+                    idle_add(callback, translation)
 
     def translate_one(self, text, literal=False):
         context = " ".join(self.context[-self.CONTEXT_CHUNKS:])

@@ -14,39 +14,18 @@ BIN="$HOME/.local/bin"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
-LLAMA_CPP_RELEASE="b12098"  # official llama.cpp build with Vulkan, used where no distro package exists
-
 install_arch() {
   # UI (GTK4 + libadwaita + floating bar), audio (parec) and local translation AI (llama.cpp with Vulkan)
   sudo pacman -S --needed python python-gobject python-cairo gtk4 libadwaita gtk4-layer-shell \
     libpulse pipewire-pulse llama-cpp ggml-vulkan vulkan-icd-loader
 }
 
-install_ubuntu() {
-  # Ubuntu 24.04+ and Linux Mint 22+. gtk4-layer-shell is optional: GNOME uses the X11 floating bar instead
-  sudo apt-get update
-  sudo apt-get install -y python3 python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
-    pulseaudio-utils libvulkan1 mesa-vulkan-drivers curl ca-certificates
-  if apt-cache show gir1.2-gtk4layershell-1.0 >/dev/null 2>&1; then
-    sudo apt-get install -y gir1.2-gtk4layershell-1.0
-  fi
-  if ! command -v llama-server >/dev/null; then
-    echo "Downloading llama.cpp $LLAMA_CPP_RELEASE (Vulkan)"
-    local url="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_CPP_RELEASE/llama-$LLAMA_CPP_RELEASE-bin-ubuntu-vulkan-x64.tar.gz"
-    rm -rf "$DATA/llama.cpp" && mkdir -p "$DATA/llama.cpp"
-    curl -fL --progress-bar "$url" | tar -xz -C "$DATA/llama.cpp" --strip-components=1
-  fi
-}
-
 say "System dependencies (asks for your password)"
-if command -v pacman >/dev/null; then
-  install_arch
-elif command -v apt-get >/dev/null; then
-  install_ubuntu
-else
-  echo "This installer supports Arch / Omarchy (pacman) and Ubuntu / Linux Mint (apt)." >&2
+if ! command -v pacman >/dev/null; then
+  echo "This installer supports Arch Linux / Omarchy only (pacman). On Windows 11, run install.cmd." >&2
   exit 1
 fi
+install_arch
 
 say "Data from earlier versions (Live Captions)"
 OLD_DATA="$SHARE/live-captions"
@@ -84,9 +63,7 @@ cat > "$BIN/laiaudio" <<'LAUNCHER'
 # Open Laiaudio. Log in ~/.cache/laiaudio/app.log
 mkdir -p "$HOME/.cache/laiaudio"
 # gtk4-layer-shell must be preloaded to draw the floating captions on Hyprland, Sway, KDE…
-for lib in /usr/lib/libgtk4-layer-shell.so /usr/lib/*-linux-gnu/libgtk4-layer-shell.so.0; do
-  if [ -e "$lib" ]; then export LD_PRELOAD="$lib"; break; fi
-done
+if [ -e /usr/lib/libgtk4-layer-shell.so ]; then export LD_PRELOAD=/usr/lib/libgtk4-layer-shell.so; fi
 exec "${XDG_DATA_HOME:-$HOME/.local/share}/laiaudio/venv/bin/python" -m laiaudio "$@" \
   >> "$HOME/.cache/laiaudio/app.log" 2>&1
 LAUNCHER

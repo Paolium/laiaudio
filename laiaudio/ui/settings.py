@@ -6,6 +6,7 @@ from ..config import config
 from ..hardware import detect, problem, recommend
 from ..models import BY_ID, of_kind
 from .model_card import ModelCard
+from .overlay import monitor_name
 
 
 def combo(title, labels, selected, on_selected, subtitle=None):
@@ -101,8 +102,8 @@ class SettingsView(Gtk.Box):
         bar.add(enabled)
 
         monitors = self.app.overlay.monitors()
-        connectors = [m.get_connector() for m in monitors]
-        labels = [f"{m.get_connector()}  ({m.get_geometry().width}×{m.get_geometry().height})" for m in monitors]
+        connectors = [monitor_name(m) for m in monitors]
+        labels = [f"{monitor_name(m)}  ({m.get_geometry().width}×{m.get_geometry().height})" for m in monitors]
         current = (config["overlay_position"] or {}).get("monitor") or config["overlay_monitor"]
         bar.add(combo("Screen", labels, connectors.index(current) if current in connectors else 0,
                       lambda i: self.set_monitor(connectors[i])))

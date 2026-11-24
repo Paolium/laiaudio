@@ -1,4 +1,7 @@
-"""Laiaudio: live (English) meeting transcription with optional Spanish translation."""
+"""Laiaudio: live (English) meeting transcription with optional Spanish translation. The GTK app (Linux).
+
+On Windows the native app in winui/ is the UI and `service.py` runs the same engine.
+"""
 import signal
 import sys
 import threading
@@ -12,45 +15,20 @@ import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, GLibUnix, Gtk  # noqa: E402
 
 from . import APP_ID, audio  # noqa: E402
 from .asr import Engine, Stream
 from .config import config
 from .models import BY_ID, Download
-from .transcript import Transcript
+from .transcript import ME, MEETING, Transcript
 from .translate import Translator, stop_leftover_servers
-from .ui.live_view import ME, MEETING
 from .ui.main_window import MainWindow
 from .ui.overlay import create_overlay
 
 CSS = """
 /* Paolium dark palette (Depth, Base, Surface, Border, Text) with the Sapphire accent.
-   Named colors for libadwaita 1.5 (Ubuntu 24.04) and CSS variables for libadwaita 1.6+. */
-@define-color accent_bg_color #0D71FD;
-@define-color accent_color #5C9DFE;
-@define-color accent_fg_color #FFFFFF;
-@define-color window_bg_color #141414;
-@define-color window_fg_color #D6DAE0;
-@define-color view_bg_color #141414;
-@define-color view_fg_color #D6DAE0;
-@define-color headerbar_bg_color #000000;
-@define-color headerbar_fg_color #D6DAE0;
-@define-color headerbar_backdrop_color #000000;
-@define-color sidebar_bg_color #000000;
-@define-color sidebar_fg_color #D6DAE0;
-@define-color sidebar_backdrop_color #000000;
-@define-color card_bg_color #2C2C2E;
-@define-color card_fg_color #D6DAE0;
-@define-color dialog_bg_color #141414;
-@define-color dialog_fg_color #D6DAE0;
-@define-color popover_bg_color #2C2C2E;
-@define-color popover_fg_color #D6DAE0;
-@define-color destructive_bg_color #FA4F67;
-@define-color destructive_color #FA4F67;
-@define-color error_color #FA4F67;
-@define-color success_color #95D700;
-@define-color warning_color #D69D00;
+   libadwaita 1.6+ reads it from these CSS variables. */
 :root {
     --accent-bg-color: #0D71FD; --accent-color: #5C9DFE; --accent-fg-color: #FFFFFF;
     --window-bg-color: #141414; --window-fg-color: #D6DAE0;
@@ -135,14 +113,6 @@ CSS = """
 """
 
 
-def css_for_this_libadwaita(css):
-    """libadwaita 1.6+ reads the palette from CSS variables; older GTK (Ubuntu 24.04) cannot parse :root."""
-    if (Adw.get_major_version(), Adw.get_minor_version()) >= (1, 6):
-        return css
-    start = css.index(":root {")
-    return css[:start] + css[css.index("}", start) + 1:]
-
-
 class App(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID)
@@ -161,7 +131,7 @@ class App(Adw.Application):
             return
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)  # Paolium dark palette
         css = Gtk.CssProvider()
-        css.load_from_string(css_for_this_libadwaita(CSS))
+        css.load_from_string(CSS)
         # Above the user theme (e.g. Omarchy) so the app colors are respected
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_USER + 1)
@@ -194,7 +164,7 @@ class App(Adw.Application):
             try:
                 engine = Engine(model, config["asr_device"])
             except Exception as e:  # noqa: BLE001
-                GLib.idle_add(self.win.show_error, "No se pudo cargar el modelo", e)
+                GLib.idle_add(self.win.show_error, "Could not load the model", e)
                 return
             GLib.idle_add(self.engine_ready, engine)
 
@@ -287,7 +257,7 @@ class App(Adw.Application):
     def start_recording(self):
         meeting = audio.meeting_source(config["system_source"])
         if not meeting:
-            self.win.toast("No audio output found (is PipeWire running?)")
+            self.win.toast(audio.NO_OUTPUT)
             return
         self.recording = True
         self.started = time.time()
@@ -388,18 +358,8 @@ class App(Adw.Application):
         return GLib.SOURCE_REMOVE
 
 
-def add_signal_handler(sig, handler):
-    """GLibUnix.signal_add on recent GLib; GLib.unix_signal_add on older ones (e.g. Ubuntu 24.04)."""
-    try:
-        from gi.repository import GLibUnix
-
-        GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, sig, handler)
-    except (ImportError, AttributeError):
-        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, handler)
-
-
 def main():
     app = App()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        add_signal_handler(sig, app.on_signal)
+        GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, sig, app.on_signal)
     app.run(sys.argv[:1])
